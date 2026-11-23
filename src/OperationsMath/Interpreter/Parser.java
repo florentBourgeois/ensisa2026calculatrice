@@ -9,8 +9,38 @@ import OperationsMath.composite.Plus;
 
 /**
  * Analyse une expression arithmétique et construit l'arbre Composite correspondant.
- **/
-
+ *
+ * <p>Le parseur suit les règles de priorité de la grammaire : {@code parseExpression()}
+ * traite les additions et soustractions, {@code parseTerme()} traite les multiplications
+ * et divisions, et {@code parseFacteur()} traite les entiers et les parenthèses.</p>
+ *
+ * <p>Pour l'expression {@code 6+3*7-(2+2)}, les appels principaux se déroulent ainsi :</p>
+ * <pre>{@code
+ * parse("6+3*7-(2+2)")
+ *   -> new Parser(source)
+ *   -> parseExpression()
+ *      -> parseTerme() -> parseFacteur() -> parseEntier() : Value(6)
+ *      -> '+' ; parseTerme()
+ *         -> parseFacteur() -> parseEntier() : Value(3)
+ *         -> '*' ; parseFacteur() -> parseEntier() : Value(7)
+ *         -> retourne Mult(Value(3), Value(7))
+ *      -> construit Plus(Value(6), Mult(...))
+ *      -> '-' ; parseTerme()
+ *         -> parseFacteur() rencontre '('
+ *            -> parseExpression()
+ *               -> parseTerme() -> parseFacteur() -> parseEntier() : Value(2)
+ *               -> '+' ; parseTerme() -> parseFacteur() -> parseEntier() : Value(2)
+ *               -> construit Plus(Value(2), Value(2))
+ *            -> expect(')') consomme ')'
+ *      -> construit Moins(Plus(...), Plus(Value(2), Value(2)))
+ *   -> ignore les espaces finaux, vérifie la fin de l'entrée et retourne la racine
+ *
+ * Les méthodes auxiliaires consume(), skipWhitespace(), isAtEnd() et isDigit()
+ * sont appelées au fil de ces étapes pour lire les caractères. En cas d'entrée
+ * invalide, expect(), parseEntier() ou parse() appellent error() pour signaler
+ * la position de l'erreur.
+ * }</pre>
+ */
 public class Parser {
     private final String source;
     private int position;
@@ -48,36 +78,78 @@ public class Parser {
     }
 
     /**
-     * Analyse une expression composée d'entiers ... wait what ???
+     * Analyse une expression composée de termes reliés par une addition ou une soustraction.
      *
-     * <p>La boucle traite les opérateurs de gauche à droite
-    * et délègue chaque opérande à {@link #parseTerme()} ()}.</p>
+     * <p>La boucle traite les opérateurs de gauche à droite et appelle
+     * {@link #parseTerme()} pour chaque opérande, ce qui donne aux multiplications
+     * et divisions une priorité supérieure.</p>
      *
      * @return l'arbre Composite representant l'expression
      */
     private Element parseExpression() {
-        System.out.println("A implémenter");
-        return parseEntier();
+        // une expression commence par un terme, puis peut être suivie de '+' ou '-' et d'un autre terme, etc.
+        Element elementA = parseTerme();
+
+        while (true) { // tant que l'on rencontre des + ou des -, on continue à parser l'expression (stop quand return)
+            skipWhitespace();
+
+            if (consume('+')) {
+                // on a rencontré un '+', il a été consommé -> on parse le terme suivant et on construit un Plus
+                // ici découpé en deux lignes pour plus de clartée. Dans le reste du code ce sesra en une
+                Element elementB = parseTerme();
+                elementA = new Plus(elementA, elementB);
+            } else if (consume('-')) {
+                elementA = new Moins(elementA, parseTerme());
+            } else {
+                return elementA; // on a rencontré autre chose qu'un '+' ou un '-', donc l'expression est terminée
+            }
+        }
     }
 
     /**
      * Analyse un terme composé de facteurs reliés par une multiplication ou une division. (meme fonctionnement que parseExpression mais pour les * et /)
      *
+     * <p>La boucle traite les opérateurs de gauche à droite et délègue chaque
+     * opérande à {@link #parseFacteur()}.</p>
+     *
      * @return l'arbre Composite representant le terme
      */
     private Element parseTerme() {
-        System.out.println("A implémenter");
-        return parseEntier();
+        Element result = parseFacteur();
+
+        while (true) {
+            skipWhitespace();
+
+            if (consume('*')) {
+                result = new Mult(result, parseFacteur());
+            } else if (consume('/')) {
+                result = new Div(result, parseFacteur());
+            } else {
+                return result;
+            }
+        }
     }
 
     /**
      * Analyse un facteur : un entier ou une expression entourée de parenthèses.
      *
+     * <p>Pour les parenthèses, cette méthode rappelle {@link #parseExpression()}
+     * afin d'analyser leur contenu complet, puis exige la parenthèse fermante.</p>
+     *
      * @return l'arbre Composite du facteur
      * @throws IllegalArgumentException si la parenthese fermante manque ou si le facteur est invalide
      */
     private Element parseFacteur() {
-        System.out.println("A implémenter");
+        skipWhitespace();
+
+        if (consume('(')) {
+            Element result = parseExpression();
+            skipWhitespace();
+            expect(')');
+            return result;
+        }
+
+        // si c'est pas une parenthèse ouvrante, on s'attend à un entier
         return parseEntier();
     }
 

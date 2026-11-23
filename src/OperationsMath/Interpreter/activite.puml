@@ -1,0 +1,72 @@
+@startuml
+title Analyse de 6+3*7-(2+2)
+
+start
+:parse("6+3*7-(2+2)");
+if (source == null ?) then (oui)
+  :Lever IllegalArgumentException;
+  stop
+else (non)
+  :Créer Parser(source), position = 0;
+endif
+
+:parseExpression() appelle parseTerme();
+:parseTerme() appelle parseFacteur();
+:parseFacteur() appelle parseEntier();
+:Lire 6 et retourner Value(6);
+:parseTerme() ne trouve ni * ni / et retourne Value(6);
+
+:parseExpression() trouve +;\nconsume('+') consomme l'opérateur;
+:Appeler parseTerme() pour 3*7;
+:parseTerme() appelle parseFacteur(), puis parseEntier();
+:Lire 3 et retourner Value(3);
+:parseTerme() trouve *;\nconsume('*') consomme l'opérateur;
+:Appeler parseFacteur(), puis parseEntier();
+:Lire 7 et retourner Value(7);
+:Construire Mult(Value(3), Value(7));
+:parseTerme() ne trouve plus * ni /;\nretourner Mult(Value(3), Value(7));
+:Construire Plus(Value(6), Mult(Value(3), Value(7)));
+
+:parseExpression() trouve -;\nconsume('-') consomme l'opérateur;
+:Appeler parseTerme() pour (2+2);
+:parseTerme() appelle parseFacteur();
+:parseFacteur() trouve et consomme (;
+:parseFacteur() appelle parseExpression()\npour analyser le contenu des parenthèses;
+:parseExpression() appelle parseTerme();
+:parseTerme() appelle parseFacteur(), puis parseEntier();
+:Lire 2 et retourner Value(2);
+:parseTerme() ne trouve ni * ni /;\nretourner Value(2);
+:parseExpression() trouve + et le consomme;
+:Appeler parseTerme() pour le second 2;
+:parseTerme() appelle parseFacteur(), puis parseEntier();
+:Lire 2 et retourner Value(2);
+:Construire Plus(Value(2), Value(2));
+:parseExpression() ne trouve plus + ni -;\nretourner Plus(Value(2), Value(2));
+:skipWhitespace() ignore les espaces éventuels;
+:expect(')') appelle consume(')') et consomme );
+:parseFacteur() retourne Plus(Value(2), Value(2));
+:Construire Moins(Plus(Value(6), Mult(Value(3), Value(7))),\nPlus(Value(2), Value(2)));
+:parseExpression() ne trouve plus + ni -;\nretourner la racine;
+
+:skipWhitespace() ignore les espaces finaux;
+if (isAtEnd() ?) then (oui)
+  :Retourner l'arbre Composite;
+  note right
+    Arbre obtenu :
+    Moins(
+      Plus(Value(6), Mult(Value(3), Value(7))),
+      Plus(Value(2), Value(2))
+    )
+
+    consume(), skipWhitespace(),
+    isAtEnd() et isDigit() sont
+    des méthodes auxiliaires utilisées
+    pendant la lecture.
+  end note
+  stop
+else (non)
+  :error("Caractère inattendu");
+  :Lever IllegalArgumentException;
+  stop
+endif
+@enduml
