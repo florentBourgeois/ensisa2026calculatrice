@@ -1,0 +1,34 @@
+@startuml
+interface Element
+
+class Operation
+class Value
+interface VisitorOperation
+
+class Bool2Valuable {
+    -bool : MyBoolean
+    +Bool2Valuable(bool : MyBoolean)
+    +getValue() : int
+    +eval() : int
+    +accept(visitor : VisitorOperation) : void
+    +toString() : String
+}
+
+class MyBoolean {
+    ~value : boolean
+    +MyBoolean(value : boolean)
+    +isTrue() : boolean
+    +setTrue() : void
+    +setFalse() : void
+    +toString() : String
+}
+
+Element <|.. Operation
+Element <-- Operation : a,b
+Element <|.. Value
+Element <|.. Bool2Valuable
+MyBoolean <|.. Bool2Valuable : adaptee
+
+Bool2Valuable ..> VisitorOperation : accept
+
+@enduml
